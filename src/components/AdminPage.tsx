@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/ui/icon'
@@ -24,12 +25,23 @@ interface Order {
   status: string
 }
 
+interface Service {
+  id: number
+  title: string
+  description: string
+  requirements: string
+  price: string
+  is_active: boolean
+}
+
 export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [settings, setSettings] = useState({ site_name: '', site_description: '' })
   const [orders, setOrders] = useState<Order[]>([])
+  const [services, setServices] = useState<Service[]>([])
   const [newService, setNewService] = useState({ title: '', description: '', requirements: '', price: '' })
+  const [editingService, setEditingService] = useState<Service | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -50,6 +62,22 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
           .catch(err => console.error('Failed to fetch orders:', err))
       }
       
+      const fetchServices = () => {
+        fetch(`${apiUrl}?path=services/all`, {
+          headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
+        })
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to fetch services')
+            return res.json()
+          })
+          .then(data => {
+            if (Array.isArray(data)) {
+              setServices(data)
+            }
+          })
+          .catch(err => console.error('Failed to fetch services:', err))
+      }
+      
       fetch(`${apiUrl}?path=settings`)
         .then(res => {
           if (!res.ok) throw new Error('Failed to fetch settings')
@@ -59,7 +87,11 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
         .catch(err => console.error('Failed to fetch settings:', err))
       
       fetchOrders()
-      const interval = setInterval(fetchOrders, 3000)
+      fetchServices()
+      const interval = setInterval(() => {
+        fetchOrders()
+        fetchServices()
+      }, 3000)
       
       return () => clearInterval(interval)
     }
@@ -115,6 +147,50 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
       }
     } catch (error) {
       toast({ title: 'Ошибка', description: 'Не удалось создать услугу', variant: 'destructive' })
+    }
+  }
+
+  const handleUpdateService = async () => {
+    if (!editingService || !editingService.title || !editingService.description || !editingService.requirements || !editingService.price) {
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' })
+      return
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}?path=services/update`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Auth': 'skzry:568876Qqq'
+        },
+        body: JSON.stringify(editingService)
+      })
+
+      if (response.ok) {
+        toast({ title: 'Успешно', description: 'Услуга обновлена' })
+        setEditingService(null)
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось обновить услугу', variant: 'destructive' })
+    }
+  }
+
+  const handleDeleteService = async (serviceId: number) => {
+    try {
+      const response = await fetch(`${apiUrl}?path=services/delete`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Auth': 'skzry:568876Qqq'
+        },
+        body: JSON.stringify({ id: serviceId })
+      })
+
+      if (response.ok) {
+        toast({ title: 'Успешно', description: 'Услуга удалена' })
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Не удалось удалить услугу', variant: 'destructive' })
     }
   }
 
@@ -339,6 +415,64 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-blue-900">Все услуги</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {services.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">Услуг пока нет</p>
+                ) : (
+                  services.map(service => (
+                    <Card key={service.id} className={`border-blue-100 ${!service.is_active && 'opacity-50'}`}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-blue-900">{service.title}</h3>
+                              <Badge variant={service.is_active ? 'default' : 'secondary'}>
+                                {service.is_active ? 'Активна' : 'Удалена'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                            <p className="text-xs text-gray-500 mb-2">
+                              <strong>Требования:</strong> {service.requirements}
+                            </p>
+                            <p className="text-lg font-bold text-blue-600">{service.price}</p>
+                          </div>
+                        </div>
+                        
+                        {service.is_active && (
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => setEditingService(service)}
+                              className="flex-1"
+                            >
+                              <Icon name="Edit" size={16} className="mr-2" />
+                              Редактировать
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive"
+                              onClick={() => handleDeleteService(service.id)}
+                              className="flex-1"
+                            >
+                              <Icon name="Trash2" size={16} className="mr-2" />
+                              Удалить
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
@@ -373,6 +507,61 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-blue-900">Редактировать услугу</DialogTitle>
+            <DialogDescription>
+              Измените данные услуги и сохраните изменения
+            </DialogDescription>
+          </DialogHeader>
+          {editingService && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Название</Label>
+                <Input
+                  value={editingService.title}
+                  onChange={(e) => setEditingService({ ...editingService, title: e.target.value })}
+                  placeholder="Прокачка до AR 60"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Описание</Label>
+                <Textarea
+                  value={editingService.description}
+                  onChange={(e) => setEditingService({ ...editingService, description: e.target.value })}
+                  placeholder="Подробное описание услуги"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Требования</Label>
+                <Textarea
+                  value={editingService.requirements}
+                  onChange={(e) => setEditingService({ ...editingService, requirements: e.target.value })}
+                  placeholder="AR уровень, доступы и т.д."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Цена</Label>
+                <Input
+                  value={editingService.price}
+                  onChange={(e) => setEditingService({ ...editingService, price: e.target.value })}
+                  placeholder="1500 ₽"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              onClick={handleUpdateService}
+              className="w-full bg-gradient-to-r from-blue-600 to-cyan-500"
+            >
+              Сохранить изменения
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

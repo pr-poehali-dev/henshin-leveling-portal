@@ -162,6 +162,40 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
         
+        elif path == 'services/delete' and method == 'PUT':
+            headers = event.get('headers', {})
+            if headers.get('x-admin-auth') != 'skzry:568876Qqq':
+                return {'statusCode': 403, 'headers': {'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'Unauthorized'}), 'isBase64Encoded': False}
+            
+            body_data = json.loads(event.get('body', '{}'))
+            with conn.cursor() as cur:
+                cur.execute(
+                    'UPDATE services SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = %s',
+                    (body_data.get('id'),)
+                )
+                conn.commit()
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'success': True}),
+                    'isBase64Encoded': False
+                }
+        
+        elif path == 'services/all' and method == 'GET':
+            headers = event.get('headers', {})
+            if headers.get('x-admin-auth') != 'skzry:568876Qqq':
+                return {'statusCode': 403, 'headers': {'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'Unauthorized'}), 'isBase64Encoded': False}
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('SELECT id, title, description, requirements, price, is_active FROM services ORDER BY id')
+                services = cur.fetchall()
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps([dict(s) for s in services]),
+                    'isBase64Encoded': False
+                }
+        
         return {
             'statusCode': 404,
             'headers': {'Access-Control-Allow-Origin': '*'},
