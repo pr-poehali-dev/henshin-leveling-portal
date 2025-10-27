@@ -38,13 +38,23 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
         fetch(`${apiUrl}?path=orders`, {
           headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
         })
-          .then(res => res.json())
-          .then(data => setOrders(data))
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to fetch orders')
+            return res.json()
+          })
+          .then(data => {
+            if (Array.isArray(data)) {
+              setOrders(data)
+            }
+          })
           .catch(err => console.error('Failed to fetch orders:', err))
       }
       
       fetch(`${apiUrl}?path=settings`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch settings')
+          return res.json()
+        })
         .then(data => setSettings(data))
         .catch(err => console.error('Failed to fetch settings:', err))
       
