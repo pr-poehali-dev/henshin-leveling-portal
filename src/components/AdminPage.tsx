@@ -5,25 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useToast } from '@/hooks/use-toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/ui/icon'
-
-interface AdminPageProps {
-  apiUrl: string
-  isAdmin: boolean
-  setIsAdmin: (value: boolean) => void
-}
-
-interface Order {
-  id: number
-  service_title: string
-  phone: string
-  game_uid: string
-  telegram: string
-  status: string
-}
 
 interface Service {
   id: number
@@ -32,207 +16,133 @@ interface Service {
   requirements: string
   price: string
   is_active: boolean
+  created_at?: string
 }
 
-export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [settings, setSettings] = useState({ site_name: '', site_description: '' })
+interface Order {
+  id: number
+  service_id: number
+  service_title: string
+  phone: string
+  game_uid: string
+  telegram: string
+  status: string
+}
+
+interface Settings {
+  site_name: string
+  site_description: string
+}
+
+interface AdminPageProps {
+  apiUrl: string
+  isAdmin: boolean
+  setIsAdmin: (value: boolean) => void
+}
+
+const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
+  const [adminPassword, setAdminPassword] = useState('')
   const [orders, setOrders] = useState<Order[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [settings, setSettings] = useState<Settings>({ site_name: '', site_description: '' })
   const [newService, setNewService] = useState({ title: '', description: '', requirements: '', price: '' })
   const [editingService, setEditingService] = useState<Service | null>(null)
-  const { toast } = useToast()
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
   useEffect(() => {
-    if (isAdmin) {
-      const fetchOrders = () => {
-        fetch(`${apiUrl}?path=orders`, {
-          headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
-        })
-          .then(res => {
-            if (!res.ok) throw new Error('Failed to fetch orders')
-            return res.json()
-          })
-          .then(data => {
-            if (Array.isArray(data)) {
-              setOrders(data)
-            }
-          })
-          .catch(err => console.error('Failed to fetch orders:', err))
-      }
-      
-      const fetchServices = () => {
-        fetch(`${apiUrl}?path=services/all`, {
-          headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
-        })
-          .then(res => {
-            if (!res.ok) throw new Error('Failed to fetch services')
-            return res.json()
-          })
-          .then(data => {
-            if (Array.isArray(data)) {
-              setServices(data)
-            }
-          })
-          .catch(err => console.error('Failed to fetch services:', err))
-      }
-      
+    if (!isAdmin) return
+
+    const fetchData = () => {
+      fetch(`${apiUrl}?path=orders`, {
+        headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
+      })
+        .then(res => res.json())
+        .then(data => setOrders(data))
+        .catch(err => console.error('Failed to fetch orders:', err))
+
+      fetch(`${apiUrl}?path=services/all`, {
+        headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
+      })
+        .then(res => res.json())
+        .then(data => setServices(data))
+        .catch(err => console.error('Failed to fetch services:', err))
+
       fetch(`${apiUrl}?path=settings`)
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch settings')
-          return res.json()
-        })
+        .then(res => res.json())
         .then(data => setSettings(data))
         .catch(err => console.error('Failed to fetch settings:', err))
-      
-      fetchOrders()
-      fetchServices()
-      const interval = setInterval(() => {
-        fetchOrders()
-        fetchServices()
-      }, 3000)
-      
-      return () => clearInterval(interval)
     }
-  }, [isAdmin, apiUrl])
+
+    fetchData()
+    const interval = setInterval(fetchData, 3000)
+
+    return () => clearInterval(interval)
+  }, [apiUrl, isAdmin])
 
   const handleLogin = () => {
-    if (username === 'skzry' && password === '568876Qqq') {
+    if (adminPassword === 'skzry:568876Qqq') {
       setIsAdmin(true)
-      toast({ title: 'Успешный вход', description: 'Добро пожаловать в админ-панель' })
-    } else {
-      toast({ title: 'Ошибка', description: 'Неверный логин или пароль', variant: 'destructive' })
     }
   }
 
-  const handleUpdateSettings = async () => {
-    try {
-      const response = await fetch(`${apiUrl}?path=settings`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Admin-Auth': 'skzry:568876Qqq'
-        },
-        body: JSON.stringify(settings)
-      })
-
-      if (response.ok) {
-        toast({ title: 'Успешно', description: 'Настройки сайта обновлены' })
-      }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Не удалось обновить настройки', variant: 'destructive' })
-    }
+  const handleUpdateOrderStatus = async (orderId: number, status: string) => {
+    await fetch(`${apiUrl}?path=orders/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      body: JSON.stringify({ order_id: orderId, status })
+    })
   }
 
   const handleCreateService = async () => {
-    if (!newService.title || !newService.description || !newService.requirements || !newService.price) {
-      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' })
-      return
-    }
+    if (!newService.title || !newService.price) return
 
-    try {
-      const response = await fetch(`${apiUrl}?path=services`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Admin-Auth': 'skzry:568876Qqq'
-        },
-        body: JSON.stringify(newService)
-      })
+    await fetch(`${apiUrl}?path=services`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      body: JSON.stringify(newService)
+    })
 
-      if (response.ok) {
-        toast({ title: 'Успешно', description: 'Услуга создана' })
-        setNewService({ title: '', description: '', requirements: '', price: '' })
-      }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Не удалось создать услугу', variant: 'destructive' })
-    }
+    setNewService({ title: '', description: '', requirements: '', price: '' })
   }
 
   const handleUpdateService = async () => {
-    if (!editingService || !editingService.title || !editingService.description || !editingService.requirements || !editingService.price) {
-      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' })
-      return
-    }
+    if (!editingService) return
 
-    try {
-      const response = await fetch(`${apiUrl}?path=services/update`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Admin-Auth': 'skzry:568876Qqq'
-        },
-        body: JSON.stringify(editingService)
-      })
+    await fetch(`${apiUrl}?path=services/update`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      body: JSON.stringify(editingService)
+    })
 
-      if (response.ok) {
-        toast({ title: 'Успешно', description: 'Услуга обновлена' })
-        setEditingService(null)
-      }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Не удалось обновить услугу', variant: 'destructive' })
-    }
+    setShowEditDialog(false)
+    setEditingService(null)
   }
 
   const handleDeleteService = async (serviceId: number) => {
-    try {
-      const response = await fetch(`${apiUrl}?path=services/delete`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Admin-Auth': 'skzry:568876Qqq'
-        },
-        body: JSON.stringify({ id: serviceId })
-      })
-
-      if (response.ok) {
-        toast({ title: 'Успешно', description: 'Услуга удалена' })
-      }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Не удалось удалить услугу', variant: 'destructive' })
-    }
+    await fetch(`${apiUrl}?path=services/delete`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      body: JSON.stringify({ service_id: serviceId })
+    })
   }
 
-  const handleUpdateOrderStatus = async (orderId: number, newStatus: string) => {
-    try {
-      const response = await fetch(`${apiUrl}?path=orders/status`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Admin-Auth': 'skzry:568876Qqq'
-        },
-        body: JSON.stringify({ order_id: orderId, status: newStatus })
-      })
-
-      if (response.ok) {
-        toast({ title: 'Статус обновлен', description: `Заявка переведена в статус: ${newStatus}` })
-      }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Не удалось обновить статус', variant: 'destructive' })
-    }
+  const handleUpdateSettings = async () => {
+    await fetch(`${apiUrl}?path=settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      body: JSON.stringify(settings)
+    })
   }
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      accepted: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
-      completed: 'bg-blue-100 text-blue-800',
-      cancelled: 'bg-gray-100 text-gray-800'
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
+      pending: { variant: 'outline', label: 'Новая' },
+      accepted: { variant: 'default', label: 'Принята' },
+      completed: { variant: 'secondary', label: 'Выполнена' },
+      rejected: { variant: 'destructive', label: 'Отклонена' }
     }
-    return colors[status] || 'bg-gray-100 text-gray-800'
-  }
-
-  const getStatusText = (status: string) => {
-    const texts: Record<string, string> = {
-      pending: 'Ожидает',
-      accepted: 'Принято',
-      rejected: 'Отклонено',
-      completed: 'Выполнено',
-      cancelled: 'Отменено'
-    }
-    return texts[status] || status
+    const config = variants[status] || variants.pending
+    return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
   if (!isAdmin) {
@@ -240,32 +150,24 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-md border-blue-200 shadow-xl">
           <CardHeader>
-            <CardTitle className="text-center text-blue-900">Вход в админ-панель</CardTitle>
+            <CardTitle className="text-center text-2xl bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+              <Icon name="Lock" size={48} className="mx-auto mb-4" />
+              Вход в админ-панель
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Логин</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Введите логин"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="password">Пароль</Label>
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="Введите пароль"
               />
             </div>
-            <Button 
-              onClick={handleLogin} 
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-500"
-            >
+            <Button onClick={handleLogin} className="w-full bg-gradient-to-r from-blue-600 to-cyan-500">
               Войти
             </Button>
           </CardContent>
@@ -277,111 +179,142 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-blue-900">Панель администратора</h1>
-        <Button 
-          variant="outline" 
-          onClick={() => setIsAdmin(false)}
-          className="border-blue-300"
-        >
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+          Панель управления
+        </h1>
+        <Button variant="outline" onClick={() => setIsAdmin(false)}>
+          <Icon name="LogOut" size={16} className="mr-2" />
           Выйти
         </Button>
       </div>
 
-      <Tabs defaultValue="orders" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="orders">Заявки</TabsTrigger>
-          <TabsTrigger value="services">Услуги</TabsTrigger>
-          <TabsTrigger value="settings">Настройки</TabsTrigger>
+      <Tabs defaultValue="orders" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 bg-blue-50">
+          <TabsTrigger value="orders" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-cyan-500 data-[state=active]:text-white transition-all">
+            <Icon name="ShoppingCart" size={16} className="mr-2" />
+            Заявки ({orders.length})
+          </TabsTrigger>
+          <TabsTrigger value="services" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-cyan-500 data-[state=active]:text-white transition-all">
+            <Icon name="Package" size={16} className="mr-2" />
+            Услуги ({services.filter(s => s.is_active).length})
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-cyan-500 data-[state=active]:text-white transition-all">
+            <Icon name="Settings" size={16} className="mr-2" />
+            Настройки
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="space-y-4">
-          <Card className="border-blue-200">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Заявки клиентов</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {orders.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">Заявок пока нет</p>
-                ) : (
-                  orders.map(order => (
-                    <Card key={order.id} className="border-blue-100">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <h3 className="font-semibold text-blue-900">{order.service_title}</h3>
-                            <div className="text-sm text-gray-600 space-y-1 mt-2">
-                              <p><Icon name="Phone" size={14} className="inline mr-2" />{order.phone}</p>
-                              <p><Icon name="Gamepad2" size={14} className="inline mr-2" />UID: {order.game_uid}</p>
-                              <p><Icon name="Send" size={14} className="inline mr-2" />{order.telegram}</p>
-                            </div>
-                          </div>
-                          <Badge className={getStatusColor(order.status)}>
-                            {getStatusText(order.status)}
-                          </Badge>
-                        </div>
-                        
-                        {order.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleUpdateOrderStatus(order.id, 'accepted')}
-                              className="flex-1 bg-green-600 hover:bg-green-700"
-                            >
-                              Принять
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive"
-                              onClick={() => handleUpdateOrderStatus(order.id, 'rejected')}
-                              className="flex-1"
-                            >
-                              Отклонить
-                            </Button>
-                          </div>
-                        )}
-                        
-                        {order.status === 'accepted' && (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleUpdateOrderStatus(order.id, 'completed')}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700"
-                            >
-                              Выполнено
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                              className="flex-1"
-                            >
-                              Отменено
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {orders.length === 0 ? (
+            <Card className="border-blue-200">
+              <CardContent className="text-center py-12">
+                <Icon name="Inbox" size={48} className="mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">Заявок пока нет</p>
+              </CardContent>
+            </Card>
+          ) : (
+            orders.map((order) => (
+              <Card key={order.id} className="border-blue-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-blue-900">{order.service_title}</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">Заявка #{order.id}</p>
+                    </div>
+                    {getStatusBadge(order.status)}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Icon name="Phone" size={16} className="text-blue-500" />
+                      <span className="font-medium">Телефон:</span>
+                      <span className="text-gray-700">{order.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Icon name="Gamepad2" size={16} className="text-cyan-500" />
+                      <span className="font-medium">UID:</span>
+                      <span className="text-gray-700">{order.game_uid}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Icon name="MessageCircle" size={16} className="text-blue-500" />
+                      <span className="font-medium">Telegram:</span>
+                      <span className="text-gray-700">{order.telegram}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    {order.status === 'pending' && (
+                      <>
+                        <Button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'accepted')}
+                          className="flex-1 bg-green-600 hover:bg-green-700 transition-all"
+                        >
+                          <Icon name="Check" size={16} className="mr-2" />
+                          Принять
+                        </Button>
+                        <Button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'rejected')}
+                          variant="destructive"
+                          className="flex-1 transition-all"
+                        >
+                          <Icon name="X" size={16} className="mr-2" />
+                          Отклонить
+                        </Button>
+                      </>
+                    )}
+                    {order.status === 'accepted' && (
+                      <>
+                        <Button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'completed')}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 transition-all"
+                        >
+                          <Icon name="CheckCircle" size={16} className="mr-2" />
+                          Выполнено
+                        </Button>
+                        <Button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'rejected')}
+                          variant="outline"
+                          className="flex-1 transition-all"
+                        >
+                          <Icon name="Ban" size={16} className="mr-2" />
+                          Отменить
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
 
         <TabsContent value="services" className="space-y-4">
-          <Card className="border-blue-200">
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
             <CardHeader>
-              <CardTitle className="text-blue-900">Создать новую услугу</CardTitle>
+              <CardTitle className="text-blue-900 flex items-center gap-2">
+                <Icon name="Plus" size={20} />
+                Создать новую услугу
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Название</Label>
-                <Input
-                  value={newService.title}
-                  onChange={(e) => setNewService({ ...newService, title: e.target.value })}
-                  placeholder="Прокачка до AR 60"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Название</Label>
+                  <Input
+                    value={newService.title}
+                    onChange={(e) => setNewService({ ...newService, title: e.target.value })}
+                    placeholder="Прокачка до AR 60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Цена</Label>
+                  <Input
+                    value={newService.price}
+                    onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                    placeholder="1500 ₽"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Описание</Label>
@@ -399,86 +332,73 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
                   placeholder="AR уровень, доступы и т.д."
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Цена</Label>
-                <Input
-                  value={newService.price}
-                  onChange={(e) => setNewService({ ...newService, price: e.target.value })}
-                  placeholder="1500 ₽"
-                />
-              </div>
-              <Button 
+              <Button
                 onClick={handleCreateService}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500"
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 transition-all"
               >
+                <Icon name="Plus" size={16} className="mr-2" />
                 Создать услугу
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="border-blue-200">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Все услуги</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {services.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">Услуг пока нет</p>
-                ) : (
-                  services.map(service => (
-                    <Card key={service.id} className={`border-blue-100 ${!service.is_active && 'opacity-50'}`}>
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-blue-900">{service.title}</h3>
-                              <Badge variant={service.is_active ? 'default' : 'secondary'}>
-                                {service.is_active ? 'Активна' : 'Удалена'}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">{service.description}</p>
-                            <p className="text-xs text-gray-500 mb-2">
-                              <strong>Требования:</strong> {service.requirements}
-                            </p>
-                            <p className="text-lg font-bold text-blue-600">{service.price}</p>
-                          </div>
-                        </div>
-                        
-                        {service.is_active && (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => setEditingService(service)}
-                              className="flex-1"
-                            >
-                              <Icon name="Edit" size={16} className="mr-2" />
-                              Редактировать
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive"
-                              onClick={() => handleDeleteService(service.id)}
-                              className="flex-1"
-                            >
-                              <Icon name="Trash2" size={16} className="mr-2" />
-                              Удалить
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {services.map((service) => (
+              <Card key={service.id} className="border-blue-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-blue-900">{service.title}</CardTitle>
+                      <p className="text-2xl font-bold text-cyan-600 mt-2">{service.price}</p>
+                    </div>
+                    <Badge variant={service.is_active ? 'default' : 'secondary'}>
+                      {service.is_active ? 'Активна' : 'Неактивна'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Описание:</p>
+                    <p className="text-sm text-gray-600">{service.description}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Требования:</p>
+                    <p className="text-sm text-gray-600">{service.requirements}</p>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={() => {
+                        setEditingService(service)
+                        setShowEditDialog(true)
+                      }}
+                      variant="outline"
+                      className="flex-1 transition-all"
+                    >
+                      <Icon name="Edit" size={16} className="mr-2" />
+                      Редактировать
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteService(service.id)}
+                      variant="destructive"
+                      className="flex-1 transition-all"
+                    >
+                      <Icon name="Trash2" size={16} className="mr-2" />
+                      Удалить
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <Card className="border-blue-200">
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
             <CardHeader>
-              <CardTitle className="text-blue-900">Настройки сайта</CardTitle>
+              <CardTitle className="text-blue-900 flex items-center gap-2">
+                <Icon name="Settings" size={20} />
+                Настройки сайта
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -494,13 +414,14 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
                 <Textarea
                   value={settings.site_description}
                   onChange={(e) => setSettings({ ...settings, site_description: e.target.value })}
-                  placeholder="Профессиональная прокачка аккаунтов"
+                  placeholder="Описание вашего сайта"
                 />
               </div>
-              <Button 
+              <Button
                 onClick={handleUpdateSettings}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500"
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 transition-all"
               >
+                <Icon name="Save" size={16} className="mr-2" />
                 Сохранить изменения
               </Button>
             </CardContent>
@@ -508,30 +429,34 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-blue-900">Редактировать услугу</DialogTitle>
-            <DialogDescription>
-              Измените данные услуги и сохраните изменения
-            </DialogDescription>
           </DialogHeader>
           {editingService && (
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Название</Label>
-                <Input
-                  value={editingService.title}
-                  onChange={(e) => setEditingService({ ...editingService, title: e.target.value })}
-                  placeholder="Прокачка до AR 60"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Название</Label>
+                  <Input
+                    value={editingService.title}
+                    onChange={(e) => setEditingService({ ...editingService, title: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Цена</Label>
+                  <Input
+                    value={editingService.price}
+                    onChange={(e) => setEditingService({ ...editingService, price: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Описание</Label>
                 <Textarea
                   value={editingService.description}
                   onChange={(e) => setEditingService({ ...editingService, description: e.target.value })}
-                  placeholder="Подробное описание услуги"
                 />
               </div>
               <div className="space-y-2">
@@ -539,29 +464,21 @@ export default function AdminPage({ apiUrl, isAdmin, setIsAdmin }: AdminPageProp
                 <Textarea
                   value={editingService.requirements}
                   onChange={(e) => setEditingService({ ...editingService, requirements: e.target.value })}
-                  placeholder="AR уровень, доступы и т.д."
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Цена</Label>
-                <Input
-                  value={editingService.price}
-                  onChange={(e) => setEditingService({ ...editingService, price: e.target.value })}
-                  placeholder="1500 ₽"
-                />
-              </div>
+              <Button
+                onClick={handleUpdateService}
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 transition-all"
+              >
+                <Icon name="Save" size={16} className="mr-2" />
+                Сохранить изменения
+              </Button>
             </div>
           )}
-          <DialogFooter>
-            <Button 
-              onClick={handleUpdateService}
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-500"
-            >
-              Сохранить изменения
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
+
+export default AdminPage

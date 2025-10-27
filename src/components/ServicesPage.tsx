@@ -97,8 +97,8 @@ export default function ServicesPage({ apiUrl }: ServicesPageProps) {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-blue-900">Услуги прокачки</h1>
-        <p className="text-gray-600 text-lg">Выберите подходящий пакет для вашего аккаунта</p>
+        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Наши услуги</h1>
+        <p className="text-gray-600 text-lg">Выберите услугу и оставьте заявку</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">

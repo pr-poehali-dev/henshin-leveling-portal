@@ -46,7 +46,7 @@ const Index = () => {
                 currentPage === 'services' ? 'text-blue-600' : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              Прокачивание аккаунтов
+              Услуги
             </button>
             <button
               onClick={() => setCurrentPage('admin')}

@@ -70,6 +70,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
         
+        elif path == 'services/all' and method == 'GET':
+            headers = event.get('headers', {})
+            if headers.get('x-admin-auth') != 'skzry:568876Qqq':
+                return {'statusCode': 403, 'headers': {'Access-Control-Allow-Origin': '*'}, 'body': json.dumps({'error': 'Unauthorized'}), 'isBase64Encoded': False}
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('SELECT id, title, description, requirements, price, is_active, created_at FROM services ORDER BY id DESC')
+                services = cur.fetchall()
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps([dict(s) for s in services]),
+                    'isBase64Encoded': False
+                }
+        
         elif path == 'services' and method == 'POST':
             headers = event.get('headers', {})
             if headers.get('x-admin-auth') != 'skzry:568876Qqq':
