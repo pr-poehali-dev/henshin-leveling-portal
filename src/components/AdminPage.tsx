@@ -54,17 +54,25 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
 
     const fetchData = () => {
       fetch(`${apiUrl}?path=orders`, {
-        headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
+        headers: { 'x-admin-auth': 'skzry:568876Qqq' }
       })
         .then(res => res.json())
-        .then(data => setOrders(data))
+        .then(data => {
+          if (Array.isArray(data)) {
+            setOrders(data)
+          }
+        })
         .catch(err => console.error('Failed to fetch orders:', err))
 
       fetch(`${apiUrl}?path=services/all`, {
-        headers: { 'X-Admin-Auth': 'skzry:568876Qqq' }
+        headers: { 'x-admin-auth': 'skzry:568876Qqq' }
       })
         .then(res => res.json())
-        .then(data => setServices(data))
+        .then(data => {
+          if (Array.isArray(data)) {
+            setServices(data)
+          }
+        })
         .catch(err => console.error('Failed to fetch services:', err))
 
       fetch(`${apiUrl}?path=settings`)
@@ -88,7 +96,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
   const handleUpdateOrderStatus = async (orderId: number, status: string) => {
     await fetch(`${apiUrl}?path=orders/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': 'skzry:568876Qqq' },
       body: JSON.stringify({ order_id: orderId, status })
     })
   }
@@ -98,7 +106,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
 
     await fetch(`${apiUrl}?path=services`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': 'skzry:568876Qqq' },
       body: JSON.stringify(newService)
     })
 
@@ -110,7 +118,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
 
     await fetch(`${apiUrl}?path=services/update`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': 'skzry:568876Qqq' },
       body: JSON.stringify(editingService)
     })
 
@@ -121,7 +129,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
   const handleDeleteService = async (serviceId: number) => {
     await fetch(`${apiUrl}?path=services/delete`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': 'skzry:568876Qqq' },
       body: JSON.stringify({ service_id: serviceId })
     })
   }
@@ -129,7 +137,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
   const handleUpdateSettings = async () => {
     await fetch(`${apiUrl}?path=settings`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Auth': 'skzry:568876Qqq' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-auth': 'skzry:568876Qqq' },
       body: JSON.stringify(settings)
     })
   }
