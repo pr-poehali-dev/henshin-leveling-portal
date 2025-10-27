@@ -80,7 +80,7 @@ const AdminPage = ({ apiUrl, isAdmin, setIsAdmin }: AdminPageProps) => {
   }, [apiUrl, isAdmin])
 
   const handleLogin = () => {
-    if (adminPassword === 'skzry:568876Qqq') {
+    if (adminPassword === 'admin123') {
       setIsAdmin(true)
     }
   }
